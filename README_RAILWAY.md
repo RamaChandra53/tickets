@@ -72,10 +72,12 @@ In the Railway dashboard:
 2. Go to the **"Logs"** tab
 3. You will see real-time output like:
    ```
-   [2026-03-25 18:00:00] 🚀 Ticket Checker started on Railway
-   [18:00:01] Fetching page...
-   [18:00:02] ❌ 20260326 - LOCKED (class: hzcALk)
-   [18:00:02] Next check in 60 seconds...
+   [2026-03-25 18:00:00] 🚀 Ticket Checker started — 2026-03-25 18:00:00
+   [2026-03-25 18:00:00] Monitoring 5 date(s): 20260326, 20260327, ...
+   [2026-03-25 18:00:01] Fetching page...
+   [2026-03-25 18:00:02] 🔒 20260326 — LOCKED
+   [2026-03-25 18:00:02] No new available dates
+   [2026-03-25 18:00:02] Next check in 60s...
    ```
 
 ### Service Health
@@ -136,21 +138,21 @@ python tickets_lite.py
 
 | File | Purpose |
 |---|---|
-| `tickets_lite.py` | Main application — lightweight scraper with Telegram alerts |
+| `tickets_lite.py` | Main application — unified lightweight scraper with Telegram alerts |
 | `requirements.txt` | Python dependencies for Railway |
 | `Procfile` | Tells Railway how to start the worker |
 | `.env.example` | Template for required environment variables |
-| `tickets.py` | Alternative — uses BookMyShow API directly |
-| `tickets_pw.py` | Alternative — uses Playwright browser automation (not recommended for Railway) |
 
 ---
 
 ## Why `tickets_lite.py` for Railway?
 
-| Feature | `tickets_lite.py` | `tickets_pw.py` |
-|---|---|---|
-| Memory usage | ~30–50 MB | ~400–600 MB |
-| Startup time | 1–2 seconds | 15–20 seconds |
-| Railway free tier | ✅ Compatible | ❌ May exceed 512 MB limit |
-| Dependencies | requests, beautifulsoup4 | playwright + Chromium |
-| Credentials | Environment variables | Environment variables |
+| Feature | `tickets_lite.py` |
+|---|---|
+| Memory usage | ~30–50 MB |
+| Startup time | 1–2 seconds |
+| Railway free tier | ✅ Compatible (well under 512 MB limit) |
+| Dependencies | requests, beautifulsoup4, python-dotenv |
+| Credentials | Environment variables only |
+| Venue filter | ✅ Configurable via `VENUE_FILTER` |
+| Browser required | ❌ None — pure HTTP requests |
