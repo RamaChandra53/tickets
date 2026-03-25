@@ -1,14 +1,19 @@
 """
 Lightweight Ticket Checker - No Playwright Required
 Uses HTTP requests + BeautifulSoup for minimal resource usage
-Suitable for deployment to AWS Lambda, Heroku, or local server
+Suitable for deployment to Railway, AWS Lambda, Heroku, or local server
 """
+import signal
+import sys
 import time
 import json
 import os
 import requests
 from datetime import datetime
 from bs4 import BeautifulSoup
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ─────────────────────────────────────────────
 # CONFIG
@@ -24,18 +29,18 @@ TARGET_DATES = [
 
 CHECK_INTERVAL = 60  # seconds
 
-# Telegram credentials
-BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8751397217:AAFCGohUQ61NBJG0BDDaXNHW9PkTn09g7CU")
-CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "6117735395")
+# Telegram credentials — set via environment variables (see .env.example)
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
 ALERT_FILE = "alert_state.json"
 
 # ─────────────────────────────────────────────
 
 def log(msg):
-    """Print timestamped message"""
-    timestamp = datetime.now().strftime('%H:%M:%S')
-    print(f"[{timestamp}] {msg}")
+    """Print timestamped message (ISO timestamp for Railway log readability)"""
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    print(f"[{timestamp}] {msg}", flush=True)
 
 
 def send_telegram(msg):
@@ -72,12 +77,12 @@ def load_state():
 
 
 def save_state(state):
-    """Save alert state to file"""
+    """Save alert state to file (best-effort — ephemeral on Railway)"""
     try:
         with open(ALERT_FILE, "w") as f:
             json.dump(state, f, indent=2)
     except IOError as e:
-        log(f"❌ Error saving state: {e}")
+        log(f"⚠️  Could not save state (ephemeral filesystem?): {e}")
 
 
 def fetch_page():
@@ -230,32 +235,39 @@ def run_once():
 
 
 def run_continuous():
-    """Run continuous monitoring loop"""
-    log("🚀 Ticket Checker Started (Continuous Mode)")
-    log(f"Will check every {CHECK_INTERVAL} seconds")
+    """Run continuous monitoring loop with graceful shutdown support"""
+    start_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    log(f"🚀 Ticket Checker started on Railway — {start_time}")
+    log(f"Monitoring {len(TARGET_DATES)} date(s): {', '.join(TARGET_DATES)}")
+    log(f"Check interval: {CHECK_INTERVAL}s | Telegram configured: {bool(BOT_TOKEN and CHAT_ID)}")
     log("Press Ctrl+C to stop\n")
-    
+
+    def _shutdown(signum, frame):
+        log("⏹️  Received shutdown signal — stopping gracefully")
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, _shutdown)
+    signal.signal(signal.SIGINT, _shutdown)
+
     try:
         while True:
             try:
                 run_once()
                 log(f"Next check in {CHECK_INTERVAL} seconds...\n")
                 time.sleep(CHECK_INTERVAL)
+            except SystemExit:
+                raise
             except Exception as e:
                 log(f"❌ Error in check loop: {e}")
                 time.sleep(10)
-    
-    except KeyboardInterrupt:
-        log("\n⏹️  Stopped by user")
-    except Exception as e:
-        log(f"❌ Fatal error: {e}")
+
+    except (KeyboardInterrupt, SystemExit):
+        log("⏹️  Stopped")
 
 
 # ─────────────────────────────────────────────
 
 if __name__ == "__main__":
-    import sys
-    
     if len(sys.argv) > 1 and sys.argv[1] == "once":
         # Run once and exit (good for cron/lambda)
         run_once()
